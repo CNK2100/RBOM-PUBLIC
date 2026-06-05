@@ -316,7 +316,7 @@ sudo apt install bazel-6.4.0
 ## Repository Structure
 
 ```
-SCION-SBOM-DEV/
+RBOM-PUBLIC/
 ├── scion-sbom/          # Modified SCION source with RBOM extensions
 │   ├── topology/        # Network topology definitions
 │   └── gen/             # Generated AS configurations
