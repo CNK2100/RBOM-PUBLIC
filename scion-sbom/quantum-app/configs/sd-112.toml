@@ -1,0 +1,41 @@
+[general]
+id = "sd1-ff00_0_112"
+config_dir = "gen/ASff00_0_112"
+
+[trust_db]
+connection = "gen-cache/sd1-ff00_0_112.trust.db"
+
+[path_db]
+connection = "gen-cache/sd1-ff00_0_112.path.db"
+
+[sd]
+address = "[fd00:f00d:cafe::7f00:b]:30255"
+
+[tracing]
+enabled = true
+debug = true
+agent = "10.200.0.1:6831"
+
+[metrics]
+prometheus = "[fd00:f00d:cafe::7f00:b]:30455"
+
+[features]
+
+[api]
+addr = "[fd00:f00d:cafe::7f00:b]:30955"
+
+[log.console]
+level = "debug"
+
+
+[drkey_level2_db]
+    # Connection for the database.
+    connection = "gen-cache/sd1-ff00_0_112.drkey_level2.db"
+
+    # The maximum number of open connections to the database. In case of 0,
+    # the limit is not set and uses the go default. (default 0)
+    max_open_conns = 0
+
+    # The maximum number of idle connections to the database. In case of 0,
+    # the limit is not set and uses the go default. (default 0)
+    max_idle_conns = 0

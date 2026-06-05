@@ -1,0 +1,47 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+load("@com_github_scionproto_scion_python_deps//:requirements.bzl", "requirement")
+
+exports_files([
+    "gzip_exec_interp",
+])
+
+sh_binary(
+    name = "docker_ip",
+    srcs = ["docker-ip"],
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "await_connectivity",
+    srcs = ["await-connectivity"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "gomocks",
+    srcs = ["gomocks.py"],
+    main = "gomocks.py",
+    deps = [
+        requirement("plumbum"),
+    ],
+)
+
+py_binary(
+    name = "topogen",
+    srcs = ["topogen.py"],
+    data = [
+        "//scion-pki/cmd/scion-pki",
+        "//tools:docker_ip",
+    ],
+    main = "topogen.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//tools/topology:py_default_library",
+        "@bazel_tools//tools/python/runfiles",
+        requirement("toml"),
+        requirement("plumbum"),
+        requirement("pyyaml"),
+    ],
+)

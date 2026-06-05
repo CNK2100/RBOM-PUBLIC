@@ -1,0 +1,13 @@
+diff --git a/internal/go_repository_tools.bzl b/internal/go_repository_tools.bzl
+index 9f2d98c..133b9b2 100644
+--- a/internal/go_repository_tools.bzl
++++ b/internal/go_repository_tools.bzl
+@@ -55,7 +55,7 @@ def _go_repository_tools_impl(ctx):
+         # workaround: avoid the Go SDK paths from leaking into the binary
+         "GOROOT_FINAL": "GOROOT",
+         # workaround: avoid cgo paths in /tmp leaking into binary
+-        "CGO_ENABLED": "0",
++        # "CGO_ENABLED": "0",
+     })
+ 
+     if "PATH" in ctx.os.environ:

@@ -1,0 +1,65 @@
+[general]
+id = "cs1-ff00_0_112-1"
+config_dir = "gen/ASff00_0_112"
+
+[trust_db]
+connection = "gen-cache/cs1-ff00_0_112-1.trust.db"
+
+[beacon_db]
+connection = "gen-cache/cs1-ff00_0_112-1.beacon.db"
+
+[path_db]
+connection = "gen-cache/cs1-ff00_0_112-1.path.db"
+
+[tracing]
+enabled = true
+debug = true
+agent = "10.200.0.1:6831"
+
+[metrics]
+prometheus = "[fd00:f00d:cafe::7f00:a]:30452"
+
+[api]
+addr = "[fd00:f00d:cafe::7f00:a]:31152"
+
+[features]
+
+[log.console]
+level = "debug"
+
+
+[drkey.level1_db]
+    # Connection for the database.
+    connection = "gen-cache/cs1-ff00_0_112-1.drkey_level1.db"
+
+    # The maximum number of open connections to the database. In case of 0,
+    # the limit is not set and uses the go default. (default 0)
+    max_open_conns = 0
+
+    # The maximum number of idle connections to the database. In case of 0,
+    # the limit is not set and uses the go default. (default 0)
+    max_idle_conns = 0
+
+[drkey.secret_value_db]
+    # Connection for the database.
+    connection = "gen-cache/cs1-ff00_0_112-1.drkey_secret_value.db"
+
+    # The maximum number of open connections to the database. In case of 0,
+    # the limit is not set and uses the go default. (default 0)
+    max_open_conns = 0
+
+    # The maximum number of idle connections to the database. In case of 0,
+    # the limit is not set and uses the go default. (default 0)
+    max_idle_conns = 0
+
+[drkey.delegation]
+    # The list of hosts authorized to get a SV per protocol.
+    scmp = [ "127.0.0.1", "127.0.0.2"]
+
+[drkey.qkd_config]
+    # QKD service parameters. Leave empty to disable (default empty).
+    url = "https://qkde0002.public"
+    sae_id = "sae-scion-2"
+    ca = "vm-kme2/SAE2/sae-scion-2.ca-chain.cert.pem"
+    cert = "vm-kme2/SAE2/sae-scion-2.cert.pem"
+    key = "vm-kme2/SAE2/sae-scion-2.key.pem"

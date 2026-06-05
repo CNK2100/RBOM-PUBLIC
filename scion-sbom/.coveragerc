@@ -1,0 +1,10 @@
+[report]
+exclude_lines =
+  pragma: no cover
+  def __repr__
+  def __str__
+  raise NotImplementedError
+[run]
+omit = external/*
+[html]
+title = SCION unit test coverage

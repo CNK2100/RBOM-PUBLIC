@@ -1,0 +1,20 @@
+diff --git a/extras/gomock.bzl b/extras/gomock.bzl
+index 72fbaabc..6c1a2262 100644
+--- a/extras/gomock.bzl
++++ b/extras/gomock.bzl
+@@ -92,6 +92,7 @@ def _gomock_source_impl(ctx):
+         env = {
+             # GOCACHE is required starting in Go 1.12
+             "GOCACHE": "./.gocache",
++            "LD_LIBRARY_PATH": "/usr/local/lib",
+         },
+     )
+ 
+@@ -302,6 +303,7 @@ def _gomock_prog_exec_impl(ctx):
+         env = {
+             # GOCACHE is required starting in Go 1.12
+             "GOCACHE": "./.gocache",
++            "LD_LIBRARY_PATH": "/usr/local/lib",
+         },
+         mnemonic = "GoMockReflectExecOnlyGen",
+     )

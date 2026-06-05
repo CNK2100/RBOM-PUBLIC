@@ -1,0 +1,12 @@
+#!/bin/bash
+
+if [ -f ".buildkite/hooks/bazel-remote.yml" ]; then
+    echo "~~~ Uploading bazel-remote and go-module-proxy logs/metrics"
+    curl http://localhost:8080/metrics > bazel-remote-cache.metrics
+    docker logs bazel-remote-cache &> bazel-remote-cache.log
+
+    curl http://localhost:3200/metrics > go-module-proxy.metrics
+    docker logs go-module-proxy &> go-module-proxy.log
+
+    buildkite-agent artifact upload "bazel-remote-cache.*;go-module-proxy.*"
+fi

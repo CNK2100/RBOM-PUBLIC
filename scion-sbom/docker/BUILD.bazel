@@ -1,0 +1,100 @@
+load("@rules_debian_packages//debian_packages:defs.bzl", "debian_packages_lockfile")
+load(":scion_app.bzl", "scion_app_base", "scion_app_image")
+load(":tester.bzl", "scion_tester_image")
+load(":endhost.bzl", "scion_endhost_image")
+load(":labels.bzl", "scion_labels")
+
+filegroup(
+    name = "prod",
+    srcs = [
+        ":control.tar",
+        ":daemon.tar",
+        ":dispatcher.tar",
+        ":gateway.tar",
+        ":router.tar",
+    ],
+)
+
+filegroup(
+    name = "test",
+    srcs = [
+        ":endhost.tar",
+        ":tester.tar",
+    ],
+)
+
+scion_labels()
+
+scion_app_base()
+
+scion_app_image(
+    name = "router",
+    src = "//router/cmd/router",
+    cmd = [
+        "--config",
+        "/etc/scion/router.toml",
+    ],
+    entrypoint = ["/app/router"],
+)
+
+scion_app_image(
+    name = "control",
+    src = "//control/cmd/control",
+    cmd = [
+        "--config",
+        "/etc/scion/cs.toml",
+    ],
+    entrypoint = ["/app/control"],
+)
+
+scion_app_image(
+    name = "dispatcher",
+    src = "//dispatcher/cmd/dispatcher",
+    cmd = [
+        "--config",
+        "/etc/scion/disp.toml",
+    ],
+    entrypoint = ["/app/dispatcher"],
+)
+
+scion_app_image(
+    name = "daemon",
+    src = "//daemon/cmd/daemon",
+    cmd = [
+        "--config",
+        "/etc/scion/sd.toml",
+    ],
+    entrypoint = ["/app/daemon"],
+)
+
+scion_app_image(
+    name = "gateway",
+    src = "//gateway/cmd/gateway",
+    caps = "cap_net_admin+ei",
+    caps_binary = "/app/gateway",
+    cmd = [
+        "--config",
+        "/etc/scion/sig.toml",
+    ],
+    entrypoint = ["/app/gateway"],
+)
+
+### Tester image with more tools for scripting in integration tests
+# This is a debian image with additional packages installed. The
+# packages are added to the image as layers created with
+# rules_debian_packages.
+#
+# Generate lockfile with:
+# bazel run //docker:tester_debian_packages.generate
+# Update snapshots with:
+# bazel run //docker:tester_debian_packages.update
+debian_packages_lockfile(
+    name = "tester_debian10_packages",
+    lock_file = "tester_packages.lock",
+    packages_file = "tester_packages.yaml",
+    snapshots_file = "tester_snapshots.yaml",
+)
+
+scion_tester_image()
+
+scion_endhost_image()

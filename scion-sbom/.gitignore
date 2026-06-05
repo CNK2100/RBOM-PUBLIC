@@ -1,0 +1,105 @@
+# OS generated files #
+#########################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# SCION generated files #
+#########################
+/logs/
+/gen/
+/genold/
+/gen-cache/
+/gen-data/
+/gen-certs/
+/traces/
+
+# Python generated files #
+#########################
+.mypy_cache/
+__pycache__
+*.pyc
+
+# vim files #
+#########################
+.*.sw?
+.ccls
+.vim/
+
+# VSCode folder
+#########################
+.vscode/
+
+# build files
+#########################
+.installstamp
+*.d
+compile_commands.json
+
+# Environment files
+#########################
+/venv/
+doc/venv/
+
+# Docker working directory
+##########################
+/docker/_build/
+/docker/perapp/hashes/
+
+# Test coverage
+##########################
+/.coverage
+/python/htmlcov/
+
+# C library binaries
+##########################
+*.a
+*.o
+*.so
+
+# Generated executables
+##########################
+/bin/*
+!/bin/.keepme
+
+# Generated package files
+##########################
+/installables/
+
+# CTags
+##########################
+tags
+
+# bazel artifacts
+##########################
+/bazel-*
+!bazel-remote.yml
+.bazel-cache/
+
+# local buildkite run
+/artifacts.out
+
+# documentation builds
+_build
+
+# IntelliJ folder
+#########################
+.idea/
+
+# node modules
+##############
+node_modules
+
+# gobra
+#######
+*.vpr
+tmp/
+logger.log
+
+# emacs backup files
+####################
+*~

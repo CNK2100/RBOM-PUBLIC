@@ -1,0 +1,15 @@
+load("//acceptance/common:topogen.bzl", "topogen_test")
+
+topogen_test(
+    name = "test",
+    src = "test.py",
+    args = [
+        "--executable",
+        "sig_ping_acceptance:$(location //acceptance/cmd/sig_ping_acceptance)",
+    ],
+    data = [
+        "//acceptance/cmd/sig_ping_acceptance",
+    ],
+    gateway = True,
+    topo = "//topology:tiny4.topo",
+)

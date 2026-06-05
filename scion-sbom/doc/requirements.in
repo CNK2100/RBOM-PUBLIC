@@ -1,0 +1,7 @@
+Sphinx
+recommonmark
+sphinx-autobuild
+sphinx-rtd-theme
+sphinxcontrib-openapi
+sphinx_copybutton
+sphinx-lint
