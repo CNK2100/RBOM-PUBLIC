@@ -146,7 +146,7 @@ Clone and build:
 ```bash
 cd ~
 git clone https://github.com/CNK2100/RBOM-PUBLIC
-cd SCION-SBOM-DEV/scion-sbom
+cd RBOM-PUBLIC/scion-sbom
 
 # Install Bazel wrapper and dependencies
 chmod +x -R .
