@@ -145,7 +145,7 @@ docker stop $(docker ps -a -q)
 Clone and build:
 ```bash
 cd ~
-git clone https://github.com/CNK2100/SCION-SBOM-DEV
+git clone https://github.com/CNK2100/RBOM-PUBLIC
 cd SCION-SBOM-DEV/scion-sbom
 
 # Install Bazel wrapper and dependencies
