@@ -8,6 +8,7 @@ import subprocess
 import csv
 import sys
 import os
+import time
 from datetime import datetime
 import math
 import shutil
@@ -17,11 +18,33 @@ global sbom
 global vuln
 global fixed
 global affected
-component_count = 0 
+component_count = 0
 vuln = 0
 fixed = 0
 affected = 0
 sbom = 0
+
+# Timing registry: filled as each stage completes
+_stage_timings = {}
+
+def _record_time(stage, elapsed):
+    """Save a stage elapsed time."""
+    _stage_timings[stage] = round(elapsed, 2)
+
+def _save_timing_report():
+    """Write timing-report.json so rbom_evaluate.py reads real values."""
+    report = {
+        "timestamp": datetime.now().isoformat(),
+        "stages": {
+            stage: {"seconds": secs, "minutes": round(secs / 60, 2)}
+            for stage, secs in _stage_timings.items()
+        },
+        "total_seconds": round(sum(_stage_timings.values()), 2),
+        "total_minutes": round(sum(_stage_timings.values()) / 60, 2),
+    }
+    with open("timing-report.json", "w") as f:
+        json.dump(report, f, indent=2)
+    return report
 
 def generate_sbom(target="/"):
     """  Module 1: Generate SBOM using Syft"""
@@ -139,7 +162,9 @@ def run_grype_scan(sbom_file, output_file):
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         grype_data = json.loads(result.stdout)
         
-        # Write intermediate JSON
+        # Write intermediate JSON (keep both names for compatibility)
+        with open("grype-report.json", "w") as f:
+            json.dump(grype_data, f, indent=2)
         with open("vuln-complete-report.json", "w") as f:
             json.dump(grype_data, f, indent=2)
         
@@ -243,6 +268,12 @@ def process_vex(grype_csv, vex_csv):
         fieldnames = ['Vulnerability', 'Package', 'Version', 'Severity', 'CVSS Score', 
                      'Fixed Version', 'VEX Status', 'Exploitability', 'Data Source', 
                      'Description', 'URLs', 'Action Required', 'Last Updated']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(vex_records)
+
+    # Also write as report.csv for backward compatibility
+    with open('report.csv', 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(vex_records)
@@ -357,10 +388,22 @@ def calculate_security_score(vex_csv):
     
     base_risk = sum(counts[sev] * weights[sev] for sev in ['critical', 'high', 'medium', 'low', 'negligible', 'unknown'])
     
+    # BUGFIX: the original formula summed risk_per_vuln * counts[status] * mult[status]
+    # across statuses. Since counts[status] scales linearly with total_vulns, weighted_risk
+    # scaled linearly with dataset size instead of staying bounded. Any SBOM with more than a
+    # few hundred CVEs (e.g. a whole-filesystem scan) produced weighted_risk in the thousands,
+    # driving exp(-weighted_risk/300) to 0 regardless of VEX status, collapsing every variant
+    # (No-VEX, VEX-binary, VEX-graded) to the same score of 0, grade F.
+    #
+    # Fix: normalize to a per-vulnerability risk DENSITY (bounded roughly 0-10, independent
+    # of N) by dividing by total_vulns before applying the exponential decay. This makes the
+    # score scale-invariant across SBOMs of different size, which is required to compare
+    # routers with different component counts along the same path.
     if total_vulns > 0:
         risk_per_vuln = base_risk / total_vulns
-        weighted_risk = sum(risk_per_vuln * counts[status] * vex_multipliers[status] 
-                          for status in ['fixed', 'affected', 'under_investigation'])
+        weighted_avg_mult = sum(counts[status] * vex_multipliers[status]
+                                 for status in ['fixed', 'affected', 'under_investigation']) / total_vulns
+        weighted_risk = risk_per_vuln * weighted_avg_mult   # risk density, bounded roughly [0, 10]
         avg_cvss = total_cvss / total_vulns
     else:
         weighted_risk = 0
@@ -369,16 +412,18 @@ def calculate_security_score(vex_csv):
     # Calculate score (0-100)
     # Using exponential decay formula for realistic scoring
     # Formula: Score = 100 * exp(-weighted_risk / scale_factor)
-    # scale_factor = 300 provides good distribution:
-    # - Risk 0-50 → Score: 85-100 (Grade A)
-    # - Risk 50-150 → Score: 61-85 (Grade B-D)
-    # - Risk 150-400 → Score: 26-61 (Grade D-F)
-    # - Risk >400 → Score: 0-26 (Grade F)
+    # weighted_risk is now a per-vulnerability risk DENSITY in ~[0, 10] (severity weight
+    # range), not a raw summed count, so scale_factor must be of the same order as the
+    # weight scale. scale_factor = 3.0 provides a full-range distribution over that scale:
+    # - Density 0.0-0.6 -> Score 82-100 (Grade A-B)
+    # - Density 0.6-1.2 -> Score 67-82  (Grade C-B)
+    # - Density 1.2-2.4 -> Score 45-67  (Grade E-D)
+    # - Density >2.4    -> Score 0-45   (Grade F-E)
     
     if weighted_risk == 0:
         score = 100
     else:
-        scale_factor = 300.0  # Adjusted for better sensitivity
+        scale_factor = 3.0  # density-scale decay constant, see bugfix note above
         score = int(100 * math.exp(-weighted_risk / scale_factor))
         score = max(0, min(100, score))  # Ensure 0-100 range
     
@@ -397,11 +442,10 @@ def calculate_security_score(vex_csv):
         grade, risk_level = 'F', 'CRITICAL'
     
     # Create report
-    # 'overall_score': score,
-    # 'grade': grade,
-    # 'weighted_risk': round(weighted_risk, 2),
     report = {
-
+        'overall_score': score,
+        'grade': grade,
+        'weighted_risk': round(weighted_risk, 4),
         'risk_level': risk_level,
         'sbom components found': component_count,
         'total_vulnerabilities': total_vulns,
@@ -437,14 +481,14 @@ def calculate_security_score(vex_csv):
 
     
     # Write text report
-    # [*] OVERALL SECURITY SCORE: {score}/100
-    # [*] SECURITY GRADE: {grade}
-    # [*]  Weighted Risk Score: {weighted_risk:.2f}
     text_report = f"""╔═══════════════════════════════════════════════════════════════════════╗
 ║                     RBOM SECURITY SCORE REPORT                        ║
 ╚═══════════════════════════════════════════════════════════════════════╝
 
+[*] OVERALL SECURITY SCORE: {score}/100
+[*] SECURITY GRADE: {grade}
 [*] RISK LEVEL: {risk_level}
+[*] Weighted Risk Density: {weighted_risk:.4f}
 
 [*] SBOM components found: {component_count}
 [*] Total Vulnerabilities: {total_vulns}
@@ -474,8 +518,7 @@ Report Files:
     
     with open('security-score.txt', 'w') as f:
         f.write(text_report)
-    # print(f"\n  [*] SBOM components found: {component_count}")
-    # print(f"\n  [*] Security Score: {score}/100 (Grade {grade})")
+    print(f"\n  [*] Security Score: {score}/100 (Grade {grade})")
     print(f"  [*] Risk Level: {risk_level}")
     print(f"  [*] Vulnerabilities: Critical={counts['critical']}, High={counts['high']}, Medium={counts['medium']}, Low={counts['low']}")
     print(f"  [*] VEX Status: Fixed={counts['fixed']}, Affected={counts['affected']}, Under Investigation={counts['under_investigation']}\n")
@@ -508,8 +551,7 @@ def generate_scion_config(score_file):
     # print(f"  Minimum Required: {min_score}/100")
     
     if config['enabled']:
-    	print()
-        # print(f"  Score meets requirements")
+        print()
     else:
         print(f"      WARNING: Score below minimum threshold!")
     
@@ -610,11 +652,16 @@ def generate_scion_staticInfoConfig():
 
     print("  [*] Created staticInfoConfig.json")
 
-    # Change directory and copy
-    os.chdir('..')
-    shutil.copy('./sbom-gen/staticInfoConfig.json', './scion-sbom/gen/ASff00_0_110/')
+    # Copy to SCION AS directory if it exists
+    scion_dst = os.path.join(os.path.dirname(os.path.abspath('.')),
+                             'scion-sbom', 'gen', 'ASff00_0_110')
+    if os.path.isdir(scion_dst):
+        shutil.copy('staticInfoConfig.json', scion_dst)
+        print(f"  [*] Copied staticInfoConfig to {scion_dst}")
+    else:
+        print("  [*] staticInfoConfig.json saved to current directory")
 
-    print("  [*] Copied staticInfoConfig to ./scion-sbom/gen/ASff00_0_110/")
+    return True
 
 
 def main():
@@ -659,10 +706,16 @@ def main():
             # print("=" * 71)
             # print()
             
+            _t0 = time.time()
             if not generate_sbom(target):
                 sys.exit(1)
+            _elapsed = time.time() - _t0
+            _record_time("Syft SBOM scan", _elapsed)
+            print(f"  [*] Module 1 elapsed: {_elapsed:.1f}s ({_elapsed/60:.2f} min)")
         else:
             print(f"  Skipping Module 1 - Using existing SBOM\n")
+            _record_time("Syft SBOM scan", 0.0)  # stage skipped; recorded as 0
+            _record_time("Syft SBOM scan", 0.0)  # skipped
     else:
         # No SBOM - automatically generate it
         print("  [*] No existing SBOM found - will generate new SBOM")
@@ -678,8 +731,12 @@ def main():
         # print("=" * 71)
         # print()
         
+        _t0 = time.time()
         if not generate_sbom(target):
             sys.exit(1)
+        _elapsed = time.time() - _t0
+        _record_time("Syft SBOM scan", _elapsed)
+        print(f"  [*] Module 1 elapsed: {_elapsed:.1f}s ({_elapsed/60:.2f} min)")
     
     # Module 2: Grype Scan + VEX
     print("=" * 71)
@@ -687,15 +744,23 @@ def main():
     print("=" * 71)
     print()
     
-    grype_csv = 'vuln-report-raw.csv'
-    vex_csv = 'vex-report.csv'
+    grype_csv = 'grype-report.csv'
+    vex_csv   = 'vex-report.csv'
 
     
+    _t0 = time.time()
     if not run_grype_scan(sbom_file, grype_csv):
         sys.exit(1)
+    _elapsed = time.time() - _t0
+    _record_time("Grype CVE match", _elapsed)
+    print(f"  [*] Grype scan elapsed: {_elapsed:.1f}s ({_elapsed/60:.2f} min)")
     
+    _t0 = time.time()
     if not process_vex(grype_csv, vex_csv):
         sys.exit(1)
+    _elapsed = time.time() - _t0
+    _record_time("VEX enrichment", _elapsed)
+    print(f"  [*] VEX enrichment elapsed: {_elapsed:.1f}s ({_elapsed/60:.2f} min)")
     
     # Module 3: Security Score
     print()
@@ -704,8 +769,12 @@ def main():
     print("=" * 71)
     print()
     
+    _t0 = time.time()
     if not calculate_security_score(vex_csv):
         sys.exit(1)
+    _elapsed = time.time() - _t0
+    _record_time("Score computation", _elapsed)
+    print(f"  [*] Module 3 elapsed: {_elapsed:.1f}s ({_elapsed/60:.2f} min)")
     
     # Module 4: SCION
     print("=" * 71)
@@ -716,8 +785,12 @@ def main():
     # if not generate_scion_config('security-score.json'):
     #     sys.exit(1)
 
+    _t0 = time.time()
     if not generate_scion_staticInfoConfig():
         sys.exit(1)
+    _elapsed = time.time() - _t0
+    _record_time("SCION config injection", _elapsed)
+    print(f"  [*] Module 4 elapsed: {_elapsed:.1f}s ({_elapsed/60:.2f} min)")
     
     # Summary
     print("=" * 71)
@@ -726,13 +799,29 @@ def main():
     print()
     print(f"  [*] SBOM components found:          {component_count}")
     print()
-    print("  [*] Generated Files:")
+    # Save and display timing report
+    timing = _save_timing_report()
+    print()
+    print("=" * 71)
+    print("  PIPELINE TIMING SUMMARY")
+    print("=" * 71)
+    print(f"  {'Stage':<30} {'Seconds':>10} {'Minutes':>10}")
+    print("  " + "-" * 52)
+    for stage, data in timing["stages"].items():
+        print(f"  {stage:<30} {data['seconds']:>10.1f} {data['minutes']:>10.2f}")
+    print("  " + "-" * 52)
+    print(f"  {'TOTAL':<30} {timing['total_seconds']:>10.1f} {timing['total_minutes']:>10.2f}")
+    print()
+
+    print(f"  [*] Generated Files:")
     print(f"    SBOM:                         {sbom_file}")
-    print(f"    Vulnerability Report (raw):   {grype_csv}")
+    print(f"    Grype Raw CSV:                {grype_csv}")
     print(f"    VEX Report:                   {vex_csv}")
+    print(f"    Grype JSON:                   grype-report.json")
     print(f"    Security Score (JSON):        security-score.json")
     print(f"    Security Score (text):        security-score.txt")
-    print(f"    SCION Config:                 scion-config.json")
+    print(f"    Timing Report:                timing-report.json")
+    print(f"    SCION Config:                 staticInfoConfig.json")
     print()
 
 if __name__ == '__main__':
