@@ -388,17 +388,7 @@ def calculate_security_score(vex_csv):
     
     base_risk = sum(counts[sev] * weights[sev] for sev in ['critical', 'high', 'medium', 'low', 'negligible', 'unknown'])
     
-    # BUGFIX: the original formula summed risk_per_vuln * counts[status] * mult[status]
-    # across statuses. Since counts[status] scales linearly with total_vulns, weighted_risk
-    # scaled linearly with dataset size instead of staying bounded. Any SBOM with more than a
-    # few hundred CVEs (e.g. a whole-filesystem scan) produced weighted_risk in the thousands,
-    # driving exp(-weighted_risk/300) to 0 regardless of VEX status, collapsing every variant
-    # (No-VEX, VEX-binary, VEX-graded) to the same score of 0, grade F.
-    #
-    # Fix: normalize to a per-vulnerability risk DENSITY (bounded roughly 0-10, independent
-    # of N) by dividing by total_vulns before applying the exponential decay. This makes the
-    # score scale-invariant across SBOMs of different size, which is required to compare
-    # routers with different component counts along the same path.
+
     if total_vulns > 0:
         risk_per_vuln = base_risk / total_vulns
         weighted_avg_mult = sum(counts[status] * vex_multipliers[status]
