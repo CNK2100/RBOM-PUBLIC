@@ -258,7 +258,7 @@ grype db update
 Run the RBOM pipeline:
 
 ```bash
-cd ~/sbom-gen
+cd ~/RBOM-PUBLIC/sbom-gen/
 python3 ./rbom.py
 ```
 
